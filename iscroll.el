@@ -1,8 +1,10 @@
 ;;; iscroll.el --- Smooth scrolling over images      -*- lexical-binding: t; -*-
 
-;; Author: Yuan Fu <casouri@gmail.com>
-;; Maintainer: Yuan Fu <casouri@gmail.com>
-;; URL: https://github.com/casouri/iscroll
+;; Author: Yuan Fu <casouri@gmail.com>,
+;;         Hyunggyu Jang <murasakipurplez5@gmail.com>
+;; Maintainer: Yuan Fu <casouri@gmail.com>,
+;;             Hyunggyu Jang <murasakipurplez5@gmail.com>
+;; URL: https://github.com/HyunggyuJang/iscroll
 ;; Version: 1.0.0
 ;; Keywords: convenience, image
 ;; Package-Requires: ((emacs "26.0"))
@@ -57,6 +59,9 @@
 ;;
 
 (require 'cl-lib)
+
+(defvar iscroll--buffers nil
+  "List of buffers in which `iscroll-mode' is activated.")
 
 (defun iscroll-up (&optional arg)
   "Scroll up ARG lines.
@@ -178,16 +183,39 @@ screen position."
     (when hit-beginning-of-buffer
       (message "%s" (error-message-string '(beginning-of-buffer))))))
 
+;;
+;;; Advices
+
+(defun +iscroll-up (orig-fn &rest args)
+  (if iscroll-mode
+      (apply
+       (function iscroll-up)
+       args)
+    (apply orig-fn args)))
+
+(defun +iscroll-down (orig-fn &rest args)
+  (if iscroll-mode
+      (apply
+       (function iscroll-down)
+       args)
+    (apply orig-fn args)))
+
 ;;;###autoload
 (define-minor-mode iscroll-mode
   "Smooth scrolling over images."
-  :lighter " IS"
   :group 'scrolling
+  :init-value nil
   (if iscroll-mode
-      (setq-local mwheel-scroll-up-function #'iscroll-up
-                  mwheel-scroll-down-function #'iscroll-down)
-    (kill-local-variable 'mwheel-scroll-up-function)
-    (kill-local-variable 'mwheel-scroll-down-function)))
+      (progn
+        (when (null iscroll--buffers)
+          (advice-add #'scroll-up :around #'+iscroll-up)
+          (advice-add #'scroll-down :around #'+iscroll-down))
+        (push (current-buffer) iscroll--buffers))
+    (setq iscroll--buffers
+          (delq (current-buffer) iscroll--buffers))
+    (when (null iscroll--buffers)
+      (advice-remove #'scroll-up #'+iscroll-up)
+      (advice-remove #'scroll-down #'+iscroll-down))))
 
 (provide 'iscroll)
 
